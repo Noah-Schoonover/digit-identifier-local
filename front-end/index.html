@@ -1,0 +1,453 @@
+<!doctype html>
+<html>
+<head>
+<title>ML Digit ID</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=0" />
+<script src="lib/jquery/jquery-1.8.2.min.js"></script>
+<style type="text/css">
+    body {
+        margin:0px;
+        width:100%;
+        height:100%;
+        font-family:Arial;
+        /* prevent text selection on ui */
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        /* prevent scrolling in windows phone */
+        -ms-touch-action: none;
+        /* prevent selection highlight */
+        -webkit-tap-highlight-color: rgba(0,0,0,0);
+        font-size: 18px;
+        line-height: 2;
+        text-align: justify;
+    }
+
+    .header {
+        float: left;
+        background-color: #222;
+        text-align: center;
+        width: 100%;
+        padding:6px;
+    }
+    .title {
+        width: auto;
+        line-height: 32px;
+        font-size: 20px;
+        font-weight: bold;
+        color: #eee;
+        text-shadow: 0px -1px #000;
+        padding:0 60px;
+    }
+    .navbtn {
+        cursor: pointer;
+        float:left;
+        padding: 6px 10px;
+        font-weight: bold;
+        line-height: 18px;
+        font-size: 14px;
+        color: #eee;
+        text-shadow: 0px -1px #000;
+        border: solid 1px #111;
+        border-radius: 4px;
+        background-color: #404040;
+        box-shadow: 0 0 1px 1px #555,inset 0 1px 0 0 #666;
+    }
+    .navbtn-hover, .navbtn:active {
+        color: #222;
+        text-shadow: 0px 1px #aaa;
+        background-color: #aaa;
+        box-shadow: 0 0 1px 1px #444,inset 0 1px 0 0 #ccc;
+    }
+
+    #canvasDiv{
+        float: left;
+        padding: 5px;
+        background-color:#ddd;
+    }
+    #page{
+    }
+    #resultDiv{
+        float: left;
+        border: 1px solid red;
+    }
+    #result{
+        font-size: 100px;
+        font-family: monospace;
+    }
+    #canvas{
+        cursor:crosshair ;
+        background-color:#fff;
+    }
+
+</style>
+<script type="text/javascript">
+
+    var ctx, color = "#000";
+
+    $(document).ready(function () {
+
+    	// setup a new canvas for drawing wait for device init
+        setTimeout(function(){
+    	   newCanvas();
+        }, 1000);
+
+    	// link the new button with newCanvas() function
+    	$("#new").click(function() {
+    		newCanvas();
+    	});
+    });
+
+    // function to setup a new canvas for drawing
+    function newCanvas(){
+
+        var canvas = '<canvas id="canvas" width="400px" height="400px"></canvas>';
+    	$("#canvasDiv").html(canvas);
+        var can=document.getElementById("canvas");
+
+        // setup canvas
+    	ctx=can.getContext("2d");
+    	ctx.strokeStyle = color;
+    	ctx.lineWidth = 35;
+        ctx.lineCap = 'round';
+
+    	// setup to trigger drawing on mouse or touch
+    	 $("#canvas").drawTouch();
+        // $("#canvas").drawPointer();
+
+        $("#result").text("")
+
+        var lastEvent;
+        var mouseDown;
+
+        //On mouse events on the canvas:
+        $("#canvas").mousedown(function(e) {
+          //On mousedown, storing the starting coordinates and enable the drawing.
+          lastEvent = e; //saving the starting coordinates
+          mouseDown = true; //drawing enabled
+        }).mousemove(function(e) {
+          //On mousemove draws the path, change the style, stroke the line, update the coordinates.
+          if (mouseDown) {
+            ctx.beginPath(); //begin the path
+            ctx.moveTo(lastEvent.offsetX, lastEvent.offsetY); //starting coordinates
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.stroke(); //draw the path
+            lastEvent = e; //replacing the coordinates
+          }
+        }).mouseup(function() {
+            //On mouseup drawing disabled
+            mouseDown = false;
+
+            resizeTo(can, 28);
+
+            //testSocket();
+
+        }).mouseleave(function(){
+
+          if(mouseDown) {
+              $("#canvas").mouseup();
+          }
+
+        });
+    }
+
+    function resizeTo(canvas, size){
+        console.log("getting resized image!");
+        // size is used for width and height for square images
+
+        var tempCanvas=document.createElement("canvas");
+        var tctx=tempCanvas.getContext("2d")
+
+        var cw=canvas.width;
+        var ch=canvas.height;
+        tempCanvas.width=size;
+        tempCanvas.height=size;
+        var ctx=canvas.getContext('2d');
+        tctx.drawImage(canvas,0,0,cw,ch,0,0,size,size);
+
+        var img = new Image();
+        img.src = tempCanvas.toDataURL();
+        $("img").remove();
+        $("#canvasDiv").append(img);
+        imgData = tctx.getImageData(0,0,tempCanvas.width,tempCanvas.height);
+
+        gsData = new Array(imgData.data.length / 4);
+        console.log("gsData length: " + gsData.length);
+
+        for(i = 0; i < imgData.data.length; i += 4) {
+            gsData[i/4] = imgData.data[i+3];
+        }
+
+        // Create WebSocket connection.
+        const socket = new WebSocket('ws://174.138.60.87:8765');
+
+        socket.onopen = function() {
+            socket.send(JSON.stringify(gsData));
+        };
+
+        socket.onmessage = function(s) {
+            $("#result").text(s.data)
+        };
+    }
+
+
+    // prototype to	start drawing on touch using canvas moveTo and lineTo
+    $.fn.drawTouch = function() {
+    	var start = function(e) {
+            e = e.originalEvent;
+    		ctx.beginPath();
+    		x = e.changedTouches[0].pageX;
+    		y = e.changedTouches[0].pageY-44;
+    		ctx.moveTo(x,y);
+    	};
+    	var move = function(e) {
+    		e.preventDefault();
+            e = e.originalEvent;
+    		x = e.changedTouches[0].pageX;
+    		y = e.changedTouches[0].pageY-44;
+    		ctx.lineTo(x,y);
+    		ctx.stroke();
+    	};
+    	$(this).on("touchstart", start);
+    	$(this).on("touchmove", move);
+    };
+
+    // prototype to	start drawing on pointer(microsoft ie) using canvas moveTo and lineTo
+    $.fn.drawPointer = function() {
+    	var start = function(e) {
+            e = e.originalEvent;
+    		ctx.beginPath();
+    		x = e.pageX;
+    		y = e.pageY-44;
+    		ctx.moveTo(x,y);
+    	};
+    	var move = function(e) {
+    		e.preventDefault();
+            e = e.originalEvent;
+    		x = e.pageX;
+    		y = e.pageY-44;
+    		ctx.lineTo(x,y);
+    		ctx.stroke();
+        };
+    	$(this).on("MSPointerDown", start);
+    	$(this).on("MSPointerMove", move);
+    };
+
+</script>
+</head>
+
+<body>
+
+    <div id="page">
+        <div class="header">
+    		<a id="new" class="navbtn">New</a>
+            <div class="title">Handwritten Digit Identifier with Machine Learning</div>
+        </div>
+        <div id="canvasDiv">
+            <p style="text-align:center">Loading Canvas...</p>
+        </div>
+        <div id="resultDiv"><span id="result"></span></div>
+        <br style="clear: left;" />
+    </div>
+
+    <div style="margin: 50px 15px 20px 15px; max-width: 900px;">
+
+        <h2>Introduction</h2>
+
+        <p>
+        This website is a practical application of machine learning. The image
+        data from the sketchbox above is captured each time the
+        user finishes a stroke. Next, the image is scaled, formatted, and sent
+        to a Linux server which hosts a pre-trained machine learning model. The
+        server queries the model with each image transmission and responds with
+        the prediction. Finally, the result is displayed on this page for the
+        user to see.
+
+        <p>
+        The following sections will discuss this project in more detail. Firstly,
+        a brief background on machine learning and the libraries used will provide
+        a necessary foundation to understand and recreate this project. The
+        Challenges section will explain unexpected obstacles that were encountered
+        while developing the project and how they were overcome. The Procedure
+        section will provide a step by step guide for building this application.
+        Finally, the Future Improvements, Lessons Learned, and Conclusion sections
+        will reflect on the benefits of this project and ideas for improving the
+        algorithm accuracy.
+
+        <h2>Background</h2>
+
+        This section provides relevant background regarding machine learning and
+        the tools used in developing this project.
+
+        <h4>Machine Learning</h4>
+
+        <p>
+        Machine learning is a category of algorithms that rely on experience to improve performance or make predictions. The learner algorithm gains knowledge by collecting data from its environment or analyzing provided data. The data could take many forms, such as human-labeled training sets or any information that the learner may record from its environment. The amount of data and data quality are crucial factors in the algorithm's overall success or prediction accuracy. For example, a simple machine learning algorithm might identify handwritten numbers, where the learner relies on human-labeled images of digits. The more sample images provided, the more accurate the algorithm, assuming the samples bear appropriate labels. Machine learning solves complex problems in many fields such as aerospace engineering, computer vision, biomedical engineering, finance, and entertainment [2]. Machine learning can be applied to almost any learning task, such as natural language processing, speech recognition, self-driving cars, fraud detection, and so on [1].
+
+        <p>
+        The vast majority of machine learning tasks fall into well defined categories which help developers determine how to configure and train the learner. Standard machine learning task categories include:
+        <ul>
+            <li> Classification, assigning classes to items,
+            <li> Ranking, ordering item according to some criteria,
+            <li> Regression, predicting actual values for some figure,
+            <li> Clustering, grouping items together, and
+            <li> Dimensionality reduction, representing items with lowered complexity
+        </ul>
+
+        <p>
+        These categorizations are important for determining the appropriate learning method for a task. Experts in the field of machine learning have produced generalized learning methods which apply specifically to certain task categories.
+
+        <p>
+        The machine learning process may occur through one of the following methods:
+
+        <ul>
+            <li> Supervised learning, with a strict reliance on labeled data. The learner receives a large amount of labeled data and attempts to make predictions about unlabeled data
+            <li> Unsupervised learning, relying solely on unlabeled data. It is difficult to evaluate the learner with this method as there are no labels to reinforce rewards or loss
+            <li> Semi-supervised learning, relying on a mix of labeled and unlabeled data. This method is used when labeled data is expensive or difficult to obtain, but unlabeled data is readily available.
+            <li> Transductive inference, relying on a combination of labeled and unlabeled data but only making predictions within a strict dataset
+            <li> Online learning, implementing multiple rounds of testing and training in which the learner makes a prediction on an unlabeled training data and then receives the correct label. If the prediction was wrong, the learner records a loss, all the while attempting to reduce “regret” by minimizing loss
+            <li> Reinforcement learning, implementing multiple rounds of testing and training through interaction with the environment. The learner attempts to maximize its reward feedback by exploring new interactions. However, the learner may stop exploring the environment to exploit known actions for a reward [1]
+            <li> Active learning, interactively and adaptively  collecting required data. This method is similar to supervised or passive learning, except the learner requests only the data it needs to maximize its reward, thereby requiring less data
+        </ul>
+
+        Regardless of the learning method, the machine learning algorithm relies fundamentally on generalization of data: relating data with a prediction and a reward without any concern for the actual meaning or form of the data. This is the key to why machine learning works, and the introduction to its importance in the field of computer science. Without machine learning, a specific algorithm must be created for every task. Rather than allowing the learner to improve through experience, it would have to be taught every detail necessary to make a prediction. Often times, this is impossible. With machine learning, problems may be solved with a layer of abstraction (by generalization), and thus, simplicity. The learner does not need to know details about its data in order to associate predictions with rewards. Rather, the algorithm learns like a human; relying on experience and reward maximization as a form of conditioning. This grants a simple solution to very complex problems in computer science. Machine learning removes the need to elucidate every aspect of a problem, as is required in most algorithms, and instead requires only an adequate amount of data to train the learner.
+
+        <h4>The Keras Module and its Application in this Project</h4>
+
+        <p>
+        The digit interpretation machine learning model was built using the Keras
+        machine learning module for handwritten digit recognition.
+        <a href="https://keras.io/">Keras</a>
+        is built on
+        Google's <a href="https://www.tensorflow.org/">TensorFlow</a>, a lower level
+        framework for machine learning. Essentially, Keras makes it easier for beginners
+        to get started with machine learning with a simple API.
+
+        <p>
+        A common starting
+        project for beginners in machine learning is training and testing a model
+        using the <a href="http://yann.lecun.com/exdb/mnist/">MNIST dataset</a>
+        (note that the MNIST webpage is often unavailable as it is frequently overloaded
+        with traffic). The MNIST dataset is among the built-in Keras
+        packages, consisting of 70,000 labeled, handwritten digit
+        samples. Usually, 60,000 of these images are used for training the neural network,
+        and 10,000 are used for testing. For the application of this project,
+        however, all 70,000 were used for training. This is because the user-input
+        is the true testing data, and the extra training samples
+        help make the model more accurate. In this case, the machine learning task is
+        classification realized by supervised learning.
+
+        <p>
+        The exact usage of this library will be explained in the Procedure section.
+
+
+        <h2>Challenges</h2>
+
+        <p>
+        The unexpected challenges in developing this project proved to be very educational.
+        The first major challenge was in routing the communication between the webpage and the server.
+        Initially, the server script utilized a basic socket library in an attempt to
+        reply to the browser. This failed, and none of the messages appeared. The solution
+        was simple after adequate research: the server must communicate using websockets.
+        Basic sockets send and receive raw TCP (Transmission Control Protocol) information only. The internet relies on
+        HTTP (Hypertext Transfer Protocol), a communication protocol built on top of TCP. This means that each transmission
+        contains required HTTP headers, and browsers will ignore any packets of improper format.
+        After switching to the <a href="https://websockets.readthedocs.io/en/stable/">websockets</a> Python
+        library, the headers were generated and interpreted automatically.
+
+        <p>
+        The next challenge relates directly to the machine learning model and its accuracy.
+        After resolving the websocket issue, the script was easily modified to query the neural network
+        with the received input data. The results, however, were very inaccurate; nearly all
+        of the model's predictions were incorrect. This implied that the input data
+        does not adequately resemble the training data. By plotting one of the testing images
+        from the training set, it was clear to see that the MNIST samples contained varying
+        pixel values. Note that the plotting function used to display this image uses
+        a heatmap with arbitrary colors; the yellow regions represent the black pixels.
+
+        <p>
+        <img src="images/digit_before.png" alt="NMIST sample before preprocessing">
+
+        <p>
+        The sketchbox in the webpage provides only black or white pixel data to the server.
+        This is detrimental to the classification process, as the algorithm will have had
+        no experience with associating pure black and white images with the appropriate labels.
+        The solution was to iterate through the entire NMIST dataset, and change all grayscale
+        values to pure black.
+
+        <p>
+        <img src="images/digit_after.png" alt="NMIST sample after preprocessing">
+
+        <p>
+        The model was retrained with the pure black data, and the accuracy increased
+        substantially.
+
+        <p>
+        The final challenge, which has not yet been resolved, pertains to the sizing
+        and positioning of the input data in contrast to that of the training data. By
+        overlaying all 70,000 samples and averaging their pixel information, it is possible
+        to plot the average location and size of the training data.
+
+        <p>
+        <img src="images/overlay.png" alt="NMIST sample data overlayed">
+
+        <p>
+        The sample data, on average, is centered and scaled to fill about 75% of the
+        image dimensions. In contrast, the user may draw their digits without any constraint
+        on size or position. This produces another disparity between the training data
+        and the input data. The solution to this problem, and other
+        possibilities for increasing the neural network accuracy will be
+        discussed in the Future Improvements section.
+
+        <h2>Procedure</h2>
+
+        <ol type="1">
+            <li>
+            <li>
+        </ol>
+
+        <h2>Future Improvements</h2>
+
+        <ul>
+            <li> TensorFlow provides a <a href="https://www.tensorflow.org/js/tutorials/conversion/import_keras">
+                JavaScript platform</a>, which is capable of
+                importing Keras models for running directly in a webpage. This may
+                be much easier than using a server and websockets to transfer data queries
+                and results; the queries would occur in-place.
+            <li> Input data will be scaled and positioned to match the training data. This
+                type of operation on the input is known as data preprocessing.
+            <li> Data augmentation is the process of generating new data from existing
+                data. Instead of obtaining entirely new samples and labels, it is
+                possible to adjust existing data to create more training points. For example,
+                the MNIST dataset could be shifted a few pixels in each direction or strethced and scaled.
+                This effectively increases the network accuracy by increasing the likelyhood of input resemblance.
+            <li> Data augmentation could also be used on the input, not just the training data.
+                In future updates, this website will augment the input by shifting and scaling. Each
+                variation of the input will be queried in the model, and the true result will be
+                the most popular or most confident classification.
+
+
+        </ul>
+
+        <h2>Lessons Learned</h2>
+
+        the balance between preprocessing and data augmentation
+        practical applications of machine learning are much more involved than
+        simple testing projects: the input doesn't always match the data like you'd expect
+        websockets
+
+
+        <h2>Conclusion</h2>
+
+        <h2>Citations</h2>
+
+        <p>[1] Mohri, Mehryar, Afshin Rostamizadeh, and Ameet Talwalkar. Foundations of machine learning. MIT press, 2018.
+
+        <p>[2] El Naqa, Issam, and Martin J. Murphy. "What is machine learning?." Machine learning in radiation oncology. Springer, Cham, 2015. 3-11.
+
+
+    </div>
+
+</body>
+</html>
