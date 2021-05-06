@@ -13,29 +13,25 @@ model = keras.models.load_model('kerasModel.model')
 
 async def hello(websocket, path):
     jsonData = await websocket.recv()
-    #print(f"data: {jsonData}")
-    print("jsonData length: ", len(jsonData))
 
     data = json.loads(jsonData)
-    print("data length: ", len(data))
 
     npData = np.array(data).reshape((1, 784))
-    print("npData.shape: ", npData.shape)
+    npData2 = npData.reshape((28, 28))
 
-    npData2 = np.array(data).reshape((28, 28))
-    print("shape debug: ", npData2.shape)
+
+    print("\n\n\n")    
     cp.printImage(npData2, 1, False)
     
 
     p = model.predict(npData)[0].tolist()
     print("p: ", p)
-    print("max p: ", max(p))
-    print("index: ", p.index(max(p)))
+    print("prediction: ", p.index(max(p)))
     m = p.index(max(p))
 
     await websocket.send(json.dumps(m))
 
-start_server = websockets.serve(hello, "", 8765)
+start_server = websockets.serve(hello, "127.0.0.1", 8765)
 
 asyncio.get_event_loop().run_until_complete(start_server)
 asyncio.get_event_loop().run_forever()
